@@ -63,8 +63,8 @@ def floodVulnerability(fcPolygon, inputCSV, damageField, normField, Number_of_Di
     arcpy.management.RemoveJoin(fcPolygon)
     #breaking the damage into 5 quantiles to rank the risk for each polygon
     #functions creates 2 new fields on fcPolygon: reclass_damageField_Class & reclass_damageField_Range, Class is the flod risk ranked 1-5 by damage
-    arcpy.management.ReclassifyField(fcPolygon, damageField, "QUANTILE", 5, "", "", "", "ACS", "reclass_"+damageField)
+    arcpy.management.ReclassifyField(fcPolygon, "new_"+damageField, "QUANTILE", 5, "", "", "", "ACS", "reclass_"+damageField)
     #coorelation test which yields z values and moran's I
     #pdf report generated at geodatabase/Output_Report.pdf
-    arcpy.stats.IncrementalSpatialAutocorrelation(fcPolygon, damageField, Number_of_Distance_Bands)
+    arcpy.stats.IncrementalSpatialAutocorrelation(fcPolygon, "new_"+damageField, Number_of_Distance_Bands)
         
