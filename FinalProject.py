@@ -1,7 +1,7 @@
 #Natalie Schoen and Nathan Mitchell
 #GEOG:3050
 #Final Project
-#May 5th, 2021
+#May 9th, 2021
 
 #Data sources:
 #SVI shapefile: https://www.atsdr.cdc.gov/placeandhealth/svi/data_documentation_download.html
@@ -27,16 +27,13 @@
 #spatial autocorrelation and hot spots to analyze each variable and the geographic clustering and variation
 #You can then run spatial regression models to evaluate the hypotheses on the effect of various factors on vulnerability from floods
 
-def floodVulnerability(fcPolygon, geodatabase):
+#function takes a polygon feature class, CSV, damage metric field from CSV, a field to normalize the damage(pop/sqmi), and an empty gdb as inputs.
+#function ouputs reclass_damageField_Class field on the input feature class which denotes the risk rank of flooding
+
+def floodVulnerability(fcPolygon, inputCSV, damageField, normField, Number_of_Distance_Bands, geodatabase):
     import arcpy
     arcpy.env.overwriteOutput = True
-    folder = "C:\Users\nschoen\OneDrive - University of Iowa\Documents\ArcGIS\Projects\finalProject"
-    arcpy.env.workspace = folder
-    arcpy.CreateFileGDB_management(folder, geodatabase)
-    #add SVI shapefile to the geodatabase 
-    shapefile = geodatabase + fcPolygon
-    #not sure to use fcPolygon or actual name
-    #shapefile = geodatabase + "/SVI2018_FLORIDA_tract.shp" 
+    #exception handling
     if arcpy.Exists(geodatabase):
         #set workspace to user input geodatabase
         arcpy.env.workspace = geodatabase
@@ -44,14 +41,30 @@ def floodVulnerability(fcPolygon, geodatabase):
     else:
         print("Workspace", geodatabase, "does not exist!")
         sys.exit(1)
-    spatial_ref = arcpy.Describe(shapefile).spatialReference
-    if spatial_ref.name != "Albers equal area conic":
-        print("Coordinate system error: Spatial reference of ", shapefile, " should be projected as 'Albers equal area conic' to match the projection of the flood hazard area basemap.")
-        #arcpy.management.Project(in_dataset, out_dataset, out_coor_system, {transform_method}, {in_coor_system}, {preserve_shape}, {max_deviation}, {vertical})
-        #https://pro.arcgis.com/en/pro-app/latest/tool-reference/data-management/project.htm
-    desc_shapefile = arcpy.Describe(shapefile)
+    spatial_ref = arcpy.Describe(fcPolygon).spatialReference
+    if spatial_ref.name != "GCS_WGS_1984":
+        print("Coordinate system error: Spatial reference of ", fcPolygon, " should be projected as 'GCS_WGS_1984' to match the projection of the basemap.")
+        arcpy.management.DefineProjection(fcPolygon, "GCS_WGS_1984")
+    desc_shapefile = arcpy.Describe(fcPolygon)
     if desc_shapefile.shapeType != "Polygon":
-        print("Error shapeType: ", shapefile, "needs to be a polygon type!")
+        print("Error shapeType: ", fcPolygon, "needs to be a polygon type!")
         sys.exit(1)
-    
-    
+    #add inputCSV to workspace
+    arcpy.TableToTable_conversion(inputCSV, arcpy.env.workspace, "FloodCSV")
+    #add shapefile to workspace
+    arcpy.conversion.FeatureClassToGeodatabase(fcPolygon, geodatabase)  
+    #join CSV to shapefile
+    arcpy.management.AddJoin(fcpolygon, "NAME", flCSV, "County Name")
+    #ReclassifyField() does not take inputs from a joined field, a new field must be added
+    arcpy.management.AddField(fcPolygon, "new_"+damageField, "LONG")
+    #new field is equal to old field divided by the normalizing field
+    arcpy.management.CalculateField(fcPolygon, "new_"+damageField, !damageField!/!normField!,"PYTHON_9.3")
+    #remove the join before executing ReclassifyField()
+    arcpy.management.RemoveJoin(fcPolygon)
+    #breaking the damage into 5 quantiles to rank the risk for each polygon
+    #functions creates 2 new fields on fcPolygon: reclass_damageField_Class & reclass_damageField_Range, Class is the flod risk ranked 1-5 by damage
+    arcpy.management.ReclassifyField(fcPolygon, damageField, "QUANTILE", 5, "", "", "", "ACS", "reclass_"+damageField)
+    #coorelation test which yields z values and moran's I
+    #pdf report generated at geodatabase/Output_Report.pdf
+    arcpy.stats.IncrementalSpatialAutocorrelation(fcPolygon, damageField, Number_of_Distance_Bands)
+        
