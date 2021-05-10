@@ -36,10 +36,9 @@
 #SVField = RPL_THEMES
 #polyjField = "COUNTY"
 #csvjField = "County Name"
-#Number_of_Distance_Bands = 15
 #geodatabase = any gdb, empty is nice
 
-def floodVulnerability(fcPolygon, inputCSV, polyjField, csvjField, damageField, normField, SVField, Number_of_Distance_Bands, geodatabase):
+def floodVulnerability(fcPolygon, inputCSV, polyjField, csvjField, damageField, normField, SVField,  geodatabase):
     import arcpy
     arcpy.env.overwriteOutput = True
     #exception handling
