@@ -27,10 +27,19 @@
 #spatial autocorrelation and hot spots to analyze each variable and the geographic clustering and variation
 #You can then run spatial regression models to evaluate the hypotheses on the effect of various factors on vulnerability from floods
 
-#function takes a polygon feature class, CSV, damage metric field from CSV, a field to normalize the damage(pop/sqmi), and an empty gdb as inputs.
+#function takes a polygon feature class, CSV, damage metric field from CSV, a SV score Field, a field to normalize the damage(pop/sqmi), and an empty gdb as inputs.
 #function ouputs reclass_damageField_Class field on the input feature class which denotes the risk rank of flooding
+#fcPolygon = "SVI2018_FLORIDA_county"
+#inputCSV = "Florida.csv"
+#damageField = PropertyDam
+#normField = POP2010/SQMI
+#SVField = RPL_THEMES
+#polyjField = "COUNTY"
+#csvjField = "County Name"
+#Number_of_Distance_Bands = 15
+#geodatabase = any gdb, empty is nice
 
-def floodVulnerability(fcPolygon, inputCSV, damageField, normField, Number_of_Distance_Bands, geodatabase):
+def floodVulnerability(fcPolygon, inputCSV, polyjField, csvjField, damageField, normField, SVField, Number_of_Distance_Bands, geodatabase):
     import arcpy
     arcpy.env.overwriteOutput = True
     #exception handling
@@ -42,9 +51,9 @@ def floodVulnerability(fcPolygon, inputCSV, damageField, normField, Number_of_Di
         print("Workspace", geodatabase, "does not exist!")
         sys.exit(1)
     spatial_ref = arcpy.Describe(fcPolygon).spatialReference
-    if spatial_ref.name != "GCS_WGS_1984":
-        print("Coordinate system error: Spatial reference of ", fcPolygon, " should be projected as 'GCS_WGS_1984' to match the projection of the basemap.")
-        arcpy.management.DefineProjection(fcPolygon, "GCS_WGS_1984")
+    if spatial_ref.name != "GCS_North_American_1983":
+        print("Coordinate system error: Spatial reference of ", fcPolygon, " should be projected as 'GCS_North_American_1983' to match the projection of the basemap.")
+        arcpy.management.DefineProjection(fcPolygon, "GCS_North_American_1983")
     desc_shapefile = arcpy.Describe(fcPolygon)
     if desc_shapefile.shapeType != "Polygon":
         print("Error shapeType: ", fcPolygon, "needs to be a polygon type!")
@@ -54,17 +63,17 @@ def floodVulnerability(fcPolygon, inputCSV, damageField, normField, Number_of_Di
     #add shapefile to workspace
     arcpy.conversion.FeatureClassToGeodatabase(fcPolygon, geodatabase)  
     #join CSV to shapefile
-    arcpy.management.AddJoin(fcpolygon, "NAME", flCSV, "County Name")
+    arcpy.management.AddJoin(fcpolygon, polyjField, flCSV, csvjField)
     #ReclassifyField() does not take inputs from a joined field, a new field must be added
-    arcpy.management.AddField(fcPolygon, "new_"+damageField, "LONG")
+    arcpy.management.AddField(fcPolygon, "n_"+damageField, "LONG")
     #new field is equal to old field divided by the normalizing field
-    arcpy.management.CalculateField(fcPolygon, "new_"+damageField, !damageField!/!normField!,"PYTHON_9.3")
+    arcpy.management.CalculateField(fcPolygon, "n_"+damageField, !damageField!/!normField!,"PYTHON_9.3")
     #remove the join before executing ReclassifyField()
     arcpy.management.RemoveJoin(fcPolygon)
     #breaking the damage into 5 quantiles to rank the risk for each polygon
     #functions creates 2 new fields on fcPolygon: reclass_damageField_Class & reclass_damageField_Range, Class is the flod risk ranked 1-5 by damage
-    arcpy.management.ReclassifyField(fcPolygon, "new_"+damageField, "QUANTILE", 5, "", "", "", "ACS", "reclass_"+damageField)
-    #coorelation test which yields z values and moran's I
-    #pdf report generated at geodatabase/Output_Report.pdf
-    arcpy.stats.IncrementalSpatialAutocorrelation(fcPolygon, "new_"+damageField, Number_of_Distance_Bands)
+    arcpy.management.ReclassifyField(fcPolygon, "n_"+damageField, "QUANTILE", 5, "", "", "", "ACS", "rc_"+damageField)
+    #OLS regression which yields: Adjusted R-Squared, Jarque-Bera p-value, Koenker (BP) Statistic p-value, Max Variance Inflation Factor, and Global Moran's I p-value
+    #pdf report generated at geodatabase/OutRep.pdf
+    arcpy.stats.ExploratoryRegression(fcPolygon, "n_"+damageField, [SVField],"","OutRep")
         
