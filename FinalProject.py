@@ -32,7 +32,7 @@
 #fcPolygon = "SVI2018_FLORIDA_county"
 #inputCSV = "Florida.csv"
 #damageField = PropertyDam
-#normField = POP2010/SQMI
+#normField = E_TOTPOP/AREA_SQMI
 #SVField = RPL_THEMES
 #polyjField = "COUNTY"
 #csvjField = "County Name"
